@@ -1,0 +1,503 @@
+// AI Sales Agent Pro - Database Schema
+// Multi-tenant: quasi ogni tabella e' isolata per companyId
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- ENUM ----------
+
+enum RoleName {
+  OWNER
+  ADMIN
+  MANAGER
+  OPERATOR
+}
+
+enum LeadStage {
+  NUOVO
+  CONTATTATO
+  PREVENTIVO
+  APPUNTAMENTO
+  VENDUTO
+  FOLLOW_UP
+  PERSO
+}
+
+enum ConversationChannel {
+  WHATSAPP
+  WEBCHAT
+  EMAIL
+}
+
+enum MessageSender {
+  CLIENTE
+  AI
+  OPERATORE
+}
+
+enum AppointmentStatus {
+  PROPOSTO
+  CONFERMATO
+  COMPLETATO
+  ANNULLATO
+}
+
+enum QuoteStatus {
+  BOZZA
+  INVIATO
+  ACCETTATO
+  RIFIUTATO
+}
+
+enum SubscriptionPlan {
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum NotificationChannel {
+  PUSH
+  EMAIL
+  WHATSAPP
+}
+
+// ---------- TENANT ROOT ----------
+
+model Company {
+  id           String   @id @default(uuid())
+  ragioneSociale String
+  partitaIva   String?  @unique
+  email        String
+  telefono     String?
+  logoUrl      String?
+  // Automazioni: link Google Review mostrato dopo un lavoro completato,
+  // ore di anticipo per il promemoria appuntamento (riduce i no-show),
+  // mesi dopo i quali riproporre un servizio ricorrente (es. manutenzione annuale).
+  googleReviewUrl      String?
+  reminderHoursBefore  Int      @default(2)
+  maintenanceFollowUpMonths Int @default(12)
+  promptPersonalizzato String?  @db.Text // istruzioni extra dell'azienda per l'AI, es. tono di voce
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users         User[]
+  clients       Client[]
+  documents     Document[]
+  appointments  Appointment[]
+  quotes        Quote[]
+  subscriptions Subscription[]
+  notifications Notification[]
+  whatsappMessages WhatsappMessage[]
+  missedCalls   MissedCall[]
+  services      Service[]
+  auditLogs     AuditLog[]
+
+  @@map("companies")
+}
+
+// ---------- AUTH / RBAC ----------
+
+model Role {
+  id          String   @id @default(uuid())
+  name        RoleName
+  permissions Permission[] @relation("RolePermissions")
+  users       User[]
+
+  @@unique([name])
+  @@map("roles")
+}
+
+model Permission {
+  id     String @id @default(uuid())
+  code   String @unique // es. "clients:write", "billing:read"
+  label  String
+  roles  Role[] @relation("RolePermissions")
+
+  @@map("permissions")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  companyId         String
+  email             String
+  passwordHash      String
+  nome              String
+  cognome           String
+  roleId            String
+  emailVerifiedAt   DateTime?
+  refreshTokenHash  String?
+  resetTokenHash    String?
+  resetTokenExpiresAt DateTime?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role           Role           @relation(fields: [roleId], references: [id])
+  deviceTokens   DeviceToken[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+
+  @@unique([companyId, email])
+  @@index([companyId])
+  @@map("users")
+}
+
+// ---------- CRM ----------
+
+enum ClientStato {
+  ATTIVO
+  INATTIVO
+  POTENZIALE
+}
+
+model Client {
+  id         String    @id @default(uuid())
+  companyId  String
+  nome       String
+  cognome    String?
+  ragioneSociale String? // per clienti business
+  telefono   String?
+  email      String?
+  indirizzo  String?
+  fonte      String?      // "WhatsApp", "Sito Web", "Telefono", "Passaparola", "Altro"
+  stato      ClientStato  @default(ATTIVO)
+  tag        String[]
+  note       String?
+  leadScore  Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads         Lead[]
+  conversations Conversation[]
+  appointments  Appointment[]
+  quotes        Quote[]
+  whatsappMessages WhatsappMessage[]
+
+  @@index([companyId])
+  @@map("clients")
+}
+
+model Lead {
+  id         String    @id @default(uuid())
+  companyId  String
+  clientId   String
+  stage      LeadStage @default(NUOVO)
+  source     String?   // es. "whatsapp", "sito", "manuale"
+  value      Decimal?  @db.Decimal(10, 2)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, stage])
+  @@map("leads")
+}
+
+// ---------- AI / CONVERSAZIONI ----------
+
+model Conversation {
+  id         String              @id @default(uuid())
+  companyId  String
+  clientId   String
+  channel    ConversationChannel @default(WHATSAPP)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  client   Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([companyId])
+  @@map("conversations")
+}
+
+model AiMessage {
+  id             String        @id @default(uuid())
+  conversationId String
+  sender         MessageSender
+  content        String
+  actionsJson    Json?         // azioni eseguite dall'AI (preventivo creato, appuntamento fissato, ecc.)
+  createdAt      DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+// ---------- DOCUMENT MEMORY (RAG) ----------
+
+model Document {
+  id         String   @id @default(uuid())
+  companyId  String
+  nomeFile   String
+  tipo       String   // pdf, docx, txt, xlsx
+  storageKey String   // path/chiave sul bucket S3-compatible
+  status     String   @default("in_elaborazione") // in_elaborazione, indicizzato, errore
+  createdAt  DateTime @default(now())
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  embeddings Embedding[]
+
+  @@index([companyId])
+  @@map("documents")
+}
+
+model Embedding {
+  id         String @id @default(uuid())
+  documentId String
+  chunkText  String
+  chunkIndex Int
+  // In produzione: vector con estensione pgvector, es. Unsupported("vector(1536)")
+  vector     Json
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("embeddings")
+}
+
+// ---------- CALENDARIO ----------
+
+model Appointment {
+  id         String            @id @default(uuid())
+  companyId  String
+  clientId   String
+  titolo     String
+  dataOra    DateTime
+  durataMin  Int               @default(60)
+  stato      AppointmentStatus @default(PROPOSTO)
+  note       String?
+  // Automazioni: evitano di rimandare due volte lo stesso promemoria/richiesta.
+  reminderSentAt      DateTime?
+  reviewRequestSentAt DateTime?
+  isRecurringService  Boolean   @default(false) // es. manutenzione annuale: riattiva checkRecurringMaintenance
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, dataOra])
+  @@map("appointments")
+}
+
+// ---------- PREVENTIVI ----------
+// Nota: non elencata esplicitamente nello schema originale ma necessaria
+// per la funzionalita' "Preventivi" descritta nel prodotto.
+
+model Quote {
+  id          String      @id @default(uuid())
+  companyId   String
+  clientId    String
+  numero      String      // es. PRV-2026-07-1001, generato alla creazione
+  taxRate     Decimal     @default(22) @db.Decimal(5, 2)
+  stato       QuoteStatus @default(BOZZA)
+  validUntil  DateTime?
+  notes       String?
+  pdfUrl      String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client  Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items   QuoteItem[]
+
+  @@index([companyId])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id            String  @id @default(uuid())
+  quoteId       String
+  descrizione   String
+  quantita      Int     @default(1)
+  prezzoUnitario Decimal @db.Decimal(10, 2)
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("quote_items")
+}
+
+// ---------- LISTINO SERVIZI (memoria prezzi dell'AI) ----------
+// Struttura dati invece di solo testo libero nei documenti: permette
+// all'AI di usare prezzi precisi, e distingue i servizi a prezzo fisso
+// da quelli "da diagnosi" (es. un idraulico non può quotare a scatola
+// chiusa una perdita non identificata) — il modulo ai.prompt.ts usa
+// questa distinzione per proporre una fascia invece di un numero secco
+// sui servizi DA_DIAGNOSI.
+
+enum ServiceTipoPrezzo {
+  FISSO
+  DA_DIAGNOSI
+}
+
+model Service {
+  id         String            @id @default(uuid())
+  companyId  String
+  nome       String
+  prezzo     Decimal           @db.Decimal(10, 2)
+  unita      String?           // "intervento", "mq", "pezzo", ecc.
+  tipoPrezzo ServiceTipoPrezzo @default(FISSO)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("services")
+}
+
+// ---------- CHIAMATE PERSE (automazione a più alto impatto sul fatturato) ----------
+// Un artigiano che lavora non risponde al telefono: quella chiamata, senza
+// questa automazione, va al concorrente in pochi secondi. Richiede un
+// provider di telefonia (es. Twilio Voice) collegato al numero dell'azienda,
+// che invia un webhook qui quando una chiamata non risponde entro N squilli.
+
+model MissedCall {
+  id            String    @id @default(uuid())
+  companyId     String
+  clientPhone   String
+  clientId      String?   // valorizzato se il numero corrisponde a un cliente già in CRM
+  calledAt      DateTime  @default(now())
+  textBackSentAt DateTime?
+  resolved      Boolean   @default(false) // true quando il cliente ha risposto al testo o è stato richiamato
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, calledAt])
+  @@map("missed_calls")
+}
+
+
+
+model WhatsappMessage {
+  id           String   @id @default(uuid())
+  companyId    String
+  clientId     String
+  direction    String   // "in" | "out"
+  content      String
+  waMessageId  String?  @unique
+  createdAt    DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("whatsapp_messages")
+}
+
+// ---------- NOTIFICHE ----------
+
+model Notification {
+  id        String              @id @default(uuid())
+  companyId String
+  userId    String?
+  channel   NotificationChannel
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String   // ios | android
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("device_tokens")
+}
+
+// ---------- BILLING ----------
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  companyId            String
+  plan                 SubscriptionPlan
+  status               SubscriptionStatus @default(TRIALING)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@index([companyId])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  subscriptionId String
+  stripeInvoiceId String?
+  importo        Decimal       @db.Decimal(10, 2)
+  stato          InvoiceStatus @default(PENDING)
+  emessaIl       DateTime      @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  invoiceId       String
+  stripePaymentId String?
+  importo         Decimal  @db.Decimal(10, 2)
+  pagatoIl        DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// ---------- AUDIT LOG ----------
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String
+  userId    String?
+  azione    String
+  dettagli  Json?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@map("audit_logs")
+}
