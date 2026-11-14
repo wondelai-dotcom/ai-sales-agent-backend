@@ -7,5 +7,6 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 EXPOSE 4000
-# All'avvio: crea/aggiorna le tabelle, semina i ruoli (idempotente) e parte il server.
-CMD ["sh", "-c", "npx prisma db push --skip-generate && npx tsx prisma/seed.ts && node dist/server.js"]
+# Schema changes must be applied by an explicit, reviewed deployment step.
+# Never mutate the production schema automatically during container startup.
+CMD ["node", "dist/server.js"]
