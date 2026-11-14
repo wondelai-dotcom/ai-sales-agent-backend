@@ -12,10 +12,10 @@ function optional(name: string, fallback = ""): string {
   return process.env[name]?.trim() ?? fallback;
 }
 
-function positiveInteger(name: string, value: string, fallback: number): number {
+function integerAtLeast(name: string, value: string, fallback: number, minimum: number): number {
   const parsed = value ? Number(value) : fallback;
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error(`La variabile ${name} deve essere un intero positivo`);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum) {
+    throw new Error(`La variabile ${name} deve essere un intero >= ${minimum}`);
   }
   return parsed;
 }
@@ -44,8 +44,8 @@ if (nodeEnv === "production" && allowedOrigins.length === 0) {
 
 export const env = {
   nodeEnv,
-  port: positiveInteger("PORT", optional("PORT"), 4000),
-  trustProxy: positiveInteger("TRUST_PROXY", optional("TRUST_PROXY"), 0),
+  port: integerAtLeast("PORT", optional("PORT"), 4000, 1),
+  trustProxy: integerAtLeast("TRUST_PROXY", optional("TRUST_PROXY"), 0, 0),
   databaseUrl: required("DATABASE_URL"),
   corsOrigins: allowedOrigins,
   jwt: {
