@@ -38,6 +38,14 @@ const allowedOrigins = optional("CORS_ORIGINS")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const resendApiKey = optional("RESEND_API_KEY");
+const emailFrom = optional("EMAIL_FROM");
+const appBaseUrl = optional("APP_BASE_URL");
+
+if (nodeEnv === "production" && (!resendApiKey || !emailFrom || !appBaseUrl)) {
+  throw new Error("RESEND_API_KEY, EMAIL_FROM e APP_BASE_URL sono obbligatorie in produzione");
+}
+
 if (nodeEnv === "production" && allowedOrigins.length === 0) {
   throw new Error("CORS_ORIGINS è obbligatoria in produzione (lista separata da virgole)");
 }
@@ -48,6 +56,7 @@ export const env = {
   trustProxy: integerAtLeast("TRUST_PROXY", optional("TRUST_PROXY"), 0, 0),
   databaseUrl: required("DATABASE_URL"),
   corsOrigins: allowedOrigins,
+  email: { resendApiKey, from: emailFrom, appBaseUrl },
   jwt: {
     accessSecret,
     refreshSecret,
