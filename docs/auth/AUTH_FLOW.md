@@ -43,7 +43,7 @@ Missing or invalid access tokens produce an unauthorized error. The access token
 2. The service verifies the JWT with the separate refresh secret.
 3. It loads the user by the JWT subject and requires a stored refresh-token hash.
 4. It hashes the presented token with SHA-256 and compares it with the stored hash.
-5. If the hash does not match, the service clears the stored hash and rejects the request. This is intended to respond to possible reuse of an already-rotated token.
+5. If the hash does not match, the service rejects the request. It does not clear the current hash, so a concurrent replay cannot invalidate a newer legitimate session. A conditional database update ensures only one concurrent request can rotate a given refresh token.
 6. If it matches, the service issues a new pair and replaces the stored refresh-token hash.
 
 The refresh endpoint is currently not protected by `requireAuth` and does not have the stricter `authRateLimiter` attached in the route declaration.
