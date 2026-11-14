@@ -1,0 +1,66 @@
+name: Generate Prisma baseline and verify
+
+on:
+  push:
+    branches: ["release/production-hardening"]
+    paths:
+      - "prisma/schema.prisma"
+      - ".github/workflows/generate-prisma-baseline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prisma-baseline-release-production-hardening
+  cancel-in-progress: false
+
+jobs:
+  generate-and-verify:
+    if: github.ref == 'refs/heads/release/production-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-not-for-production-000000000000000
+      JWT_REFRESH_SECRET: ci-refresh-secret-not-for-production-000000000000000
+      CORS_ORIGINS: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/production-hardening
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies and create lockfile
+        run: npm install
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Generate baseline migration for a new empty database
+        shell: bash
+        run: |
+          if [ ! -d prisma/migrations ] || [ -z "$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -print -quit)" ]; then
+            mkdir -p prisma/migrations/20261114000000_initial
+            npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/20261114000000_initial/migration.sql
+            printf 'provider = "postgresql"\n' > prisma/migrations/migration_lock.toml
+          fi
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: TypeScript build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+      - name: Commit generated migration and lockfile
+        shell: bash
+        run: |
+          if [ -f prisma/migrations/20261114000000_initial/migration.sql ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add prisma/migrations package-lock.json
+            if ! git diff --cached --quiet; then
+              git commit -m "db: generate initial PostgreSQL migration and lock dependencies [skip ci]"
+              git push origin HEAD:release/production-hardening
+            fi
+          fi
