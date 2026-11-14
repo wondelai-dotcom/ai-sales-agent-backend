@@ -150,6 +150,8 @@ model User {
   resetTokenExpiresAt DateTime?
   isActive          Boolean   @default(true)
   tokenVersion      Int       @default(0)
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
