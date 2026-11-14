@@ -6,7 +6,15 @@ import { env } from "../../config/env";
 import { sendTransactionalEmail } from "../../shared/services/email";
 import { LoginInput, RegisterInput } from "./auth.validation";
 
-function escapeHtml(value: string) { return value.replace(/[&<>"\']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"' : "&quot;", "\'": "&#39;" }[c] ?? c)); }
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character: string): string => {
+    if (character === "&") return "&amp;";
+    if (character === "<") return "&lt;";
+    if (character === ">") return "&gt;";
+    if (character === '"') return "&quot;";
+    return "&#39;";
+  });
+}
 
 export const authService = {
   async register(input: RegisterInput) {
@@ -18,7 +26,7 @@ export const authService = {
     if (!ownerRole) throw new AppError("Ruolo OWNER non configurato: eseguire il seed", 500, "SEED_MISSING");
 
     const passwordHash = await hashPassword(input.password);
-    const { company, user } = await authRepository.createCompanyWithOwner({
+    const { user } = await authRepository.createCompanyWithOwner({
       ragioneSociale: input.ragioneSociale,
       companyEmail: email,
       ownerEmail: email,
