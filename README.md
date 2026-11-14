@@ -208,3 +208,11 @@ da solo non risolve:
   Postgres (piu' semplice da gestire, consigliato per l'MVP) oppure un
   servizio dedicato (Pinecone/Qdrant) — nello schema attuale `Embedding.vector`
   e' un campo `Json` proprio per restare agnostico finche' non si decide.
+
+## Production hardening and release gate
+
+The production hardening work is tracked in [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md). Authentication architecture and API details are in [docs/auth/](docs/auth/AUTHENTICATION.md). The release checklist identifies items that still block production launch; a passing build alone is not a production-readiness sign-off.
+
+### Local environment
+
+Copy `.env.example` to `.env` and replace all placeholder values. Never commit `.env` or production secrets. Production requires distinct high-entropy JWT secrets and an explicit `CORS_ORIGINS` allowlist.
