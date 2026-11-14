@@ -1,12 +1,31 @@
 import "./style.css";
 const API = (import.meta.env.VITE_API_URL || "https://ai-sales-agent-backend-6ve3.onrender.com").replace(/\/$/, "");
 const $ = (selector, root=document) => root.querySelector(selector);
-const state = { token: sessionStorage.getItem("asa_access_token"), user: null, page: "overview", busy: false };
+const state = { token: sessionStorage.getItem("asa_access_token"), user: null, page: "overview", busy: false, demo: false };
 const esc = (v="") => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money = v => new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(Number(v||0));
 const date = v => v ? new Date(v).toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"}) : "—";
 
+const demoData = {
+  "/api/clients": [
+    {id:"demo-c1",nome:"Sofia",cognome:"Rossi",ragioneSociale:"Studio Rossi",email:"sofia.rossi@example.test",telefono:"+39 02 5550 1001",stato:"ATTIVO"},
+    {id:"demo-c2",nome:"Luca",cognome:"Bianchi",ragioneSociale:"Bianchi Design",email:"luca.bianchi@example.test",telefono:"+39 02 5550 1002",stato:"ATTIVO"},
+    {id:"demo-c3",nome:"Giulia",cognome:"Verdi",ragioneSociale:"Verdi Consulting",email:"giulia.verdi@example.test",telefono:"+39 02 5550 1003",stato:"NUOVO"},
+    {id:"demo-c4",nome:"Marco",cognome:"Conti",ragioneSociale:"Conti Retail",email:"marco.conti@example.test",telefono:"+39 02 5550 1004",stato:"ATTIVO"},
+    {id:"demo-c5",nome:"Elena",cognome:"Ferrari",ragioneSociale:"Ferrari Group",email:"elena.ferrari@example.test",telefono:"+39 02 5550 1005",stato:"ATTIVO"}
+  ],
+  "/api/leads":[{id:"demo-l1",client:{nome:"Sofia Rossi"},source:"Sito web",value:4200,stage:"IN_TRATTATIVA"},{id:"demo-l2",client:{nome:"Luca Bianchi"},source:"Referral",value:2800,stage:"QUALIFICATO"},{id:"demo-l3",client:{nome:"Giulia Verdi"},source:"LinkedIn",value:6500,stage:"NUOVO"}],
+  "/api/appointments":[{id:"demo-a1",titolo:"Consulenza iniziale · Sofia Rossi",dataOra:"2026-11-17T10:00:00",durataMin:45,stato:"CONFERMATO"},{id:"demo-a2",titolo:"Presentazione proposta · Luca Bianchi",dataOra:"2026-11-18T14:30:00",durataMin:60,stato:"CONFERMATO"},{id:"demo-a3",titolo:"Follow-up · Giulia Verdi",dataOra:"2026-11-20T11:00:00",durataMin:30,stato:"PROPOSTO"}],
+  "/api/quotes":[{id:"DEMO-1042",client:{nome:"Sofia Rossi"},total:4200,stato:"INVIATO"},{id:"DEMO-1041",client:{nome:"Luca Bianchi"},total:2800,stato:"BOZZA"},{id:"DEMO-1038",client:{nome:"Marco Conti"},total:1900,stato:"ACCETTATO"}]
+};
 async function request(path, options={}) {
+  if(state.demo){
+    if(options.method && options.method!=="GET") throw new Error("La modalità demo è in sola lettura. Crea un account per utilizzare le funzioni operative.");
+    if(path.startsWith("/api/clients")) return demoData["/api/clients"];
+    if(demoData[path]) return demoData[path];
+    if(path==="/api/ai/message") return {message:"Questa è una dimostrazione: l'assistente AI sarà disponibile dopo la configurazione del tuo account."};
+    return {};
+  }
   const headers = {"Content-Type":"application/json", ...(options.headers||{})};
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
   const res = await fetch(API+path,{...options,headers});
@@ -32,12 +51,14 @@ function authView(mode="login") {
         <label>Password<input type="password" name="password" autocomplete="${register?"new-password":"current-password"}" minlength="${register?12:1}" required /></label>
         <button class="btn primary wide" type="submit">${register?"Crea account":"Accedi"} <span>→</span></button>
       </form>
+      ${!register?'<div class="demo-divider"><span>OPPURE</span></div><button id="demo-entry" class="btn secondary wide demo-entry" type="button">Esplora la demo <span>↗</span></button><p class="demo-caption">Entra senza registrarti · dati di esempio · sola lettura</p>':""}
       <div class="auth-switch">${register?"Hai già un account?":"Non hai ancora un account?"} <button id="switch-auth" class="text-button">${register?"Accedi":"Crea un account"}</button></div>
       <div id="auth-error" class="form-error" role="alert"></div>
       ${!register?'<button id="forgot-password" class="text-button" type="button">Hai dimenticato la password?</button>':""}
       <p class="legal">Continuando accetti di utilizzare il servizio nel rispetto dei termini e dell'informativa privacy.</p></div></section>
     </main><div id="toast" class="toast"></div>`;
   $("#switch-auth").onclick=()=>authView(register?"login":"register");
+  if(!register) $("#demo-entry").onclick=()=>{state.demo=true;state.token=null;state.user={nome:"Demo",email:"demo@example.test",azienda:"Azienda dimostrativa"};state.page="overview";shell();renderPage();};
   if(!register) $("#forgot-password").onclick=async()=>{
     const email=$('input[name="email"]')?.value?.trim();
     if(!email){$("#auth-error").textContent="Inserisci prima la tua email.";return;}
@@ -65,9 +86,10 @@ const nav=[["overview","Panoramica","▦"],["clients","Clienti","♙"],["leads",
 function shell() {
   $("#app").innerHTML=`
     <div class="app-shell"><aside class="sidebar"><div class="brand-inline"><div class="brand-mark">A</div><div><b>AI Sales Agent</b><small>WORKSPACE</small></div></div><div class="side-label">MENU PRINCIPALE</div><nav>${nav.map(([id,label,ico])=>`<button class="nav-link ${state.page===id?"active":""}" data-page="${id}"><span>${ico}</span>${label}</button>`).join("")}</nav><div class="sidebar-bottom"><div class="status-dot"></div><span>API configurata</span><button id="logout" title="Esci">↗</button></div></aside>
-    <main class="main-area"><header class="topbar"><div><span class="crumb">Workspace</span><span class="crumb-sep">/</span><b id="page-title">Panoramica</b></div><div class="top-actions"><span class="online-pill"><i></i> Ambiente online</span><div class="avatar">${esc((state.user?.nome||state.user?.email||"U").slice(0,1).toUpperCase())}</div></div></header><section id="page-content" class="content"></section></main></div><div id="toast" class="toast"></div>`;
+    <main class="main-area">${state.demo?'<div class="demo-banner"><b>MODALITÀ DEMO</b><span>Stai esplorando dati fittizi. Nessuna informazione viene salvata.</span><button id="exit-demo">Esci dalla demo</button></div>':""}<header class="topbar"><div><span class="crumb">Workspace</span><span class="crumb-sep">/</span><b id="page-title">Panoramica</b></div><div class="top-actions"><span class="online-pill"><i></i> Ambiente online</span><div class="avatar">${esc((state.user?.nome||state.user?.email||"U").slice(0,1).toUpperCase())}</div></div></header><section id="page-content" class="content"></section></main></div><div id="toast" class="toast"></div>`;
   document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{state.page=b.dataset.page;renderPage();});
-  $("#logout").onclick=async()=>{try{await request("/api/auth/logout",{method:"POST"});}catch{} state.token=null;sessionStorage.removeItem("asa_access_token");authView();};
+  $("#logout").onclick=async()=>{if(!state.demo){try{await request("/api/auth/logout",{method:"POST"});}catch{}} state.demo=false;state.token=null;sessionStorage.removeItem("asa_access_token");authView("login");};
+  if(state.demo) $("#exit-demo").onclick=()=>{state.demo=false;state.user=null;authView("login");};
 }
 async function loadApp(){
   try { state.user=await request("/api/auth/me"); shell(); await renderPage(); }
