@@ -25,7 +25,7 @@ export function requireAuth(req: AuthenticatedRequest, _res: Response, next: Nex
 
   void prisma.user.findUnique({ where: { id: payload.sub }, include: { role: true } })
     .then((user) => {
-      if (!user || !user.isActive || user.companyId !== payload.companyId || user.tokenVersion !== payload.tokenVersion) {
+      if (!user || !user.isActive || !user.emailVerifiedAt || user.companyId !== payload.companyId || user.tokenVersion !== payload.tokenVersion) {
         return next(AppError.unauthorized("Account non attivo o sessione revocata"));
       }
       req.auth = { userId: user.id, companyId: user.companyId, roleId: user.roleId, roleName: user.role.name };
