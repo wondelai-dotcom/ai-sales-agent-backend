@@ -17,7 +17,7 @@ This repository is not considered production-ready merely because it builds. Rel
 
 ## Blocking items — do not launch with real customer data until closed
 
-1. **Password reset delivery:** current service generates a reset token but has no email sender. Implement a provider, secure delivery, expiry/one-time-use tests and operational monitoring.
+1. **Email provider verification:** Resend delivery is implemented, but configure and verify the sender domain, secrets, templates/links and delivery events in staging. Confirm account verification and password reset end-to-end.
 2. **Database migrations — confirmed blocker:** there is currently no `prisma/migrations/` directory in the repository. The production Docker startup no longer runs `prisma db push`; this avoids silently mutating a live schema, but it also means a database cannot be provisioned by this image alone. Create and review a baseline migration, commit it, and deploy it with `prisma migrate deploy` before enabling the service. Do not use `prisma db push` as a production migration strategy.
 3. **Automated tests:** add meaningful unit/integration tests, especially auth, authorization, tenant isolation and core CRUD. A successful TypeScript build is not a substitute.
 4. **CORS/browser authentication contract:** choose and verify token storage, XSS/CSRF protections, and exact production origins with the actual frontend.
