@@ -64,7 +64,7 @@ export const authService = {
     catch { throw AppError.unauthorized("Refresh token non valido o scaduto"); }
 
     const user = await authRepository.findUserById(payload.sub);
-    if (!user || !user.isActive || !user.refreshTokenHash) throw AppError.unauthorized("Sessione non valida");
+    if (!user || !user.isActive || !user.emailVerifiedAt || !user.refreshTokenHash) throw AppError.unauthorized("Sessione non valida");
     const presentedHash = hashToken(refreshToken);
     if (user.refreshTokenHash !== presentedHash) throw AppError.unauthorized("Sessione non valida, effettuare nuovamente il login");
 
@@ -109,11 +109,16 @@ export const authService = {
     const token = generateRandomToken();
     await authRepository.setEmailVerificationToken(user.id, hashToken(token), new Date(Date.now() + 24 * 60 * 60 * 1000));
     const verifyUrl = `${env.email.appBaseUrl}/verify-email?token=${encodeURIComponent(token)}`;
-    await sendTransactionalEmail({
-      to: user.email,
-      subject: "Conferma il tuo indirizzo email",
-      html: `<p><a href="${verifyUrl}">Verifica il tuo indirizzo email</a></p><p>Il collegamento scade tra 24 ore.</p>`,
-    });
+    try {
+      await sendTransactionalEmail({
+        to: user.email,
+        subject: "Conferma il tuo indirizzo email",
+        html: `<p><a href="${verifyUrl}">Verifica il tuo indirizzo email</a></p><p>Il collegamento scade tra 24 ore.</p>`,
+      });
+    } catch {
+      // Keep the same public response for unknown and known email addresses.
+      console.error("Email verification resend could not be delivered");
+    }
   },
 
   async verifyEmail(token: string) {
