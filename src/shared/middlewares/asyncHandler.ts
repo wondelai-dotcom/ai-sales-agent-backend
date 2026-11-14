@@ -1,14 +1,14 @@
-import { NextFunction, Request, Response, RequestHandler } from "express";
+import { NextFunction, Request, RequestHandler, Response } from "express";
 
 /**
  * Express 4 does not automatically forward rejected promises returned by
- * async route handlers. Wrap every async controller so failures reach the
- * centralized error handler instead of becoming unhandled rejections.
+ * async route handlers. Preserve each controller's request subtype while
+ * adapting it to an Express RequestHandler.
  */
-export function asyncHandler(
-  handler: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
+export function asyncHandler<TRequest extends Request = Request>(
+  handler: (req: TRequest, res: Response, next: NextFunction) => Promise<unknown>
 ): RequestHandler {
   return (req, res, next) => {
-    Promise.resolve(handler(req, res, next)).catch(next);
+    Promise.resolve(handler(req as TRequest, res, next)).catch(next);
   };
 }
