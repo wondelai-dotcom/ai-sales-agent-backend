@@ -30,3 +30,5 @@ export const verifyEmailSchema = z.object({ token: z.string().min(32).max(512) }
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const resendEmailVerificationSchema = z.object({ email: z.string().trim().email().max(254) });
