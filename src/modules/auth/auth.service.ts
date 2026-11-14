@@ -60,19 +60,33 @@ export const authService = {
     }
 
     const user = await authRepository.findUserById(payload.sub);
-    if (!user || !user.refreshTokenHash) {
+    if (!user || !user.isActive || !user.refreshTokenHash) {
       throw AppError.unauthorized("Sessione non valida");
     }
 
-    const matches = user.refreshTokenHash === hashToken(refreshToken);
-    if (!matches) {
-      // Possibile riuso di un refresh token gia' invalidato: per sicurezza
-      // revochiamo la sessione corrente.
-      await authRepository.setRefreshTokenHash(user.id, null);
+    const presentedHash = hashToken(refreshToken);
+    if (user.refreshTokenHash !== presentedHash) {
       throw AppError.unauthorized("Sessione non valida, effettuare nuovamente il login");
     }
 
-    return this.issueTokens(user.id, user.companyId, user.roleId, user.role.name);
+    // Compare-and-swap prevents two concurrent requests from successfully
+    // rotating the same refresh token (replay/race protection).
+    const accessToken = signAccessToken({
+      sub: user.id,
+      companyId: user.companyId,
+      roleId: user.roleId,
+      roleName: user.role.name,
+    });
+    const nextRefreshToken = signRefreshToken(user.id);
+    const rotated = await authRepository.rotateRefreshTokenHash(
+      user.id,
+      presentedHash,
+      hashToken(nextRefreshToken)
+    );
+    if (!rotated) {
+      throw AppError.unauthorized("Refresh token già utilizzato; effettuare nuovamente il login");
+    }
+    return { accessToken, refreshToken: nextRefreshToken };
   },
 
   async logout(userId: string) {
