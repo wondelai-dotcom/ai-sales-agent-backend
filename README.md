@@ -208,3 +208,14 @@ da solo non risolve:
   Postgres (piu' semplice da gestire, consigliato per l'MVP) oppure un
   servizio dedicato (Pinecone/Qdrant) — nello schema attuale `Embedding.vector`
   e' un campo `Json` proprio per restare agnostico finche' non si decide.
+
+## Authentication documentation
+
+Detailed documentation of the implemented authentication flow, endpoints, token handling, security review and test plan is available in [`docs/auth/`](docs/auth/AUTHENTICATION.md):
+
+- [Authentication overview](docs/auth/AUTHENTICATION.md)
+- [Request flows](docs/auth/AUTH_FLOW.md)
+- [Token and credential security](docs/auth/TOKEN_SECURITY.md)
+- [Authentication API reference](docs/auth/API_AUTH.md)
+- [Security review and production gaps](docs/auth/SECURITY_REVIEW.md)
+- [Authentication testing guide](docs/auth/AUTH_TESTING.md)
