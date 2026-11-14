@@ -28,3 +28,5 @@ export const confirmPasswordResetSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const verifyEmailSchema = z.object({ token: z.string().min(32).max(512) });
