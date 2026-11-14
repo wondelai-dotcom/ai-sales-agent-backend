@@ -18,7 +18,7 @@ This repository is not considered production-ready merely because it builds. Rel
 ## Blocking items — do not launch with real customer data until closed
 
 1. **Password reset delivery:** current service generates a reset token but has no email sender. Implement a provider, secure delivery, expiry/one-time-use tests and operational monitoring.
-2. **Database migrations:** deployment currently needs a reviewed, versioned migration workflow. Do not use `prisma db push` as a production migration strategy. Verify whether migrations are committed and make deployment use `prisma migrate deploy`.
+2. **Database migrations — confirmed blocker:** there is currently no `prisma/migrations/` directory in the repository. The production Docker startup no longer runs `prisma db push`; this avoids silently mutating a live schema, but it also means a database cannot be provisioned by this image alone. Create and review a baseline migration, commit it, and deploy it with `prisma migrate deploy` before enabling the service. Do not use `prisma db push` as a production migration strategy.
 3. **Automated tests:** add meaningful unit/integration tests, especially auth, authorization, tenant isolation and core CRUD. A successful TypeScript build is not a substitute.
 4. **CORS/browser authentication contract:** choose and verify token storage, XSS/CSRF protections, and exact production origins with the actual frontend.
 5. **Rate limiting at scale:** express-rate-limit's default in-memory store is per-process. Use a shared Redis-backed store before horizontal scaling.
@@ -49,14 +49,15 @@ Optional integrations must remain disabled until their credentials and webhook v
 
 1. Review the complete diff and CI result.
 2. Provision a staging database and production-like environment variables.
-3. Apply reviewed migrations using the production migration mechanism.
-4. Run integration, authorization and tenant-isolation tests against staging.
-5. Verify password reset delivery, token rotation, logout and account recovery.
-6. Test backups and a restore to a separate database.
-7. Verify HTTPS, CORS, proxy behavior, rate limits and health probes.
-8. Perform a smoke test with synthetic data.
-9. Deploy with rollback available and monitor errors, latency and database health.
-10. Enable real customers only after every blocker is closed.
+3. Generate and review the initial Prisma migration; commit the migration files and verify a clean database can be provisioned from scratch.
+4. Apply reviewed migrations using `prisma migrate deploy` and run `npx prisma db seed` (or the documented seed command) to create the required OWNER/ADMIN/MANAGER/OPERATOR roles.
+5. Run integration, authorization and tenant-isolation tests against staging.
+6. Verify password reset delivery, token rotation, logout and account recovery.
+7. Test backups and a restore to a separate database.
+8. Verify HTTPS, CORS, proxy behavior, rate limits and health probes.
+9. Perform a smoke test with synthetic data.
+10. Deploy with rollback available and monitor errors, latency and database health.
+11. Enable real customers only after every blocker is closed.
 
 ## Important scope note
 
