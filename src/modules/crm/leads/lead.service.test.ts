@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const repository = { create: vi.fn(), listByCompany: vi.fn(), updateStage: vi.fn(), countByStage: vi.fn() };
-const clients = { findById: vi.fn() };
+const { repository, clients } = vi.hoisted(() => ({ repository: { create: vi.fn(), listByCompany: vi.fn(), updateStage: vi.fn(), countByStage: vi.fn() }, clients: { findById: vi.fn() } }));
 vi.mock("./lead.repository", () => ({ leadRepository: repository }));
 vi.mock("../clients/client.repository", () => ({ clientRepository: clients }));
 
