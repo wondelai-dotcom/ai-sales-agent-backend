@@ -1,7 +1,7 @@
 import rateLimit from "express-rate-limit";
 
 const common = {
-  standardHeaders: "draft-8" as const,
+  standardHeaders: true,
   legacyHeaders: false,
   // In-memory store is suitable for a single instance only. Configure a
   // shared store (Redis) before running multiple backend replicas.
