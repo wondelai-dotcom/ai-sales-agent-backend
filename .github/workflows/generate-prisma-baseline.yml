@@ -16,10 +16,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: prisma-baseline-release-production-hardening
-  cancel-in-progress: false
-
 jobs:
   generate-and-verify:
     runs-on: ubuntu-latest
