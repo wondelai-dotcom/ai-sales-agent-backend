@@ -1,0 +1,39 @@
+# Render Blueprint for AI Sales Agent API.
+# Create the managed PostgreSQL database separately, then provide DATABASE_URL
+# with sslmode=require in the Render Dashboard. Never commit secrets here.
+services:
+  - type: web
+    name: ai-sales-agent-api
+    runtime: node
+    region: frankfurt
+    plan: 0.5c-512mb
+    branch: release/production-hardening
+    buildCommand: npm install && npx prisma generate && npm run build
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 60
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
