@@ -36,7 +36,7 @@ export const authService = {
       html: `<p>Ciao ${escapeHtml(input.nome)},</p><p>Conferma il tuo indirizzo email entro 24 ore:</p><p><a href="${verifyUrl}">Verifica email</a></p>`,
     });
     if (!emailDelivered && env.nodeEnv !== "production") console.info("[development] email verification URL:", verifyUrl);
-    return this.issueTokens(user.id, company.id, user.roleId, "OWNER", user.tokenVersion);
+    return { verificationRequired: true };
   },
 
   async login(input: LoginInput) {
@@ -86,12 +86,26 @@ export const authService = {
     const rawToken = generateRandomToken();
     await authRepository.setResetToken(user.id, hashToken(rawToken), new Date(Date.now() + 30 * 60 * 1000));
     const resetUrl = `${env.email.appBaseUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
-    const emailDelivered = await sendTransactionalEmail({
+    let emailDelivered = false;
+    try { emailDelivered = await sendTransactionalEmail({
       to: user.email,
       subject: "Reimposta la tua password",
       html: `<p>Hai richiesto di reimpostare la password.</p><p><a href="${resetUrl}">Reimposta password</a></p><p>Il collegamento scade tra 30 minuti. Se non hai richiesto tu il reset, ignora questa email.</p>`,
-    });
+    }); } catch { console.error("Password reset email could not be delivered"); }
     if (!emailDelivered && env.nodeEnv !== "production") console.info("[development] password reset URL:", resetUrl);
+  },
+
+  async resendEmailVerification(emailInput: string) {
+    const user = await authRepository.findUserByEmail(emailInput.trim().toLowerCase());
+    if (!user || user.emailVerifiedAt) return;
+    const token = generateRandomToken();
+    await authRepository.setEmailVerificationToken(user.id, hashToken(token), new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const verifyUrl = `${env.email.appBaseUrl}/verify-email?token=${encodeURIComponent(token)}`;
+    await sendTransactionalEmail({
+      to: user.email,
+      subject: "Conferma il tuo indirizzo email",
+      html: `<p><a href="${verifyUrl}">Verifica il tuo indirizzo email</a></p><p>Il collegamento scade tra 24 ore.</p>`,
+    });
   },
 
   async verifyEmail(token: string) {
