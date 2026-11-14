@@ -12,15 +12,19 @@ export const appointmentRepository = {
     }),
 
   // Controlla sovrapposizioni per evitare doppie prenotazioni sullo stesso slot.
-  findOverlapping: (companyId: string, start: Date, end: Date) =>
-    prisma.appointment.findFirst({
+  findOverlapping: async (companyId: string, start: Date, end: Date) => {
+    const candidates = await prisma.appointment.findMany({
       where: {
         companyId,
         stato: { not: "ANNULLATO" },
-        dataOra: { lt: end },
-        AND: [{ dataOra: { gte: new Date(start.getTime() - 1000 * 60 * 60 * 8) } }],
+        dataOra: { lt: end, gte: new Date(start.getTime() - 8 * 60 * 60 * 1000) },
       },
-    }),
+      select: { dataOra: true, durataMin: true },
+    });
+    return candidates.find((candidate) =>
+      candidate.dataOra.getTime() + candidate.durataMin * 60 * 1000 > start.getTime()
+    ) ?? null;
+  },
 
   create: (companyId: string, data: { clientId: string; titolo: string; dataOra: Date; durataMin: number; note?: string }) =>
     prisma.appointment.create({ data: { ...data, companyId } }),
