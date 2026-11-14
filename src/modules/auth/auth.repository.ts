@@ -46,6 +46,14 @@ export const authRepository = {
   setRefreshTokenHash: (userId: string, refreshTokenHash: string | null) =>
     prisma.user.update({ where: { id: userId }, data: { refreshTokenHash } }),
 
+  rotateRefreshTokenHash: async (userId: string, expectedHash: string, nextHash: string) => {
+    const result = await prisma.user.updateMany({
+      where: { id: userId, refreshTokenHash: expectedHash, isActive: true },
+      data: { refreshTokenHash: nextHash },
+    });
+    return result.count === 1;
+  },
+
   setResetToken: (userId: string, resetTokenHash: string, expiresAt: Date) =>
     prisma.user.update({ where: { id: userId }, data: { resetTokenHash, resetTokenExpiresAt: expiresAt } }),
 
@@ -55,6 +63,6 @@ export const authRepository = {
   updatePasswordAndClearReset: (userId: string, passwordHash: string) =>
     prisma.user.update({
       where: { id: userId },
-      data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+      data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null, refreshTokenHash: null },
     }),
 };
