@@ -96,9 +96,13 @@ export const aiService = {
 
     await aiRepository.saveMessage(conversation.id, "AI", parsed.reply, parsed.azioni);
 
-    const eseguite = await this.executeActions(companyId, clientId, parsed.azioni);
-
-    return { reply: parsed.reply, azioniEseguite: eseguite };
+    // Never let an LLM perform financial or scheduling side effects autonomously.
+    // Actions are returned as proposals until a dedicated human-approval workflow exists.
+    return {
+      reply: parsed.reply,
+      azioniInAttesaDiApprovazione: parsed.azioni,
+      azioniEseguite: [],
+    };
   },
 
   // Esegue le azioni decise dall'AI chiamando i service degli altri moduli:
