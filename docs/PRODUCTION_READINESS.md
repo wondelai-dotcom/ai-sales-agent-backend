@@ -15,10 +15,20 @@ This repository is not considered production-ready merely because it builds. Rel
 - Added graceful shutdown and Prisma disconnect.
 - Added a CI workflow for Prisma generation, TypeScript build and available tests.
 
+## Release status (2026-11-14)
+
+- [x] Prisma schema validation in GitHub Actions.
+- [x] Initial PostgreSQL migration generated and committed at `prisma/migrations/20261114000000_initial/migration.sql`.
+- [x] Migration applied successfully to a clean PostgreSQL 16 database in CI using `prisma migrate deploy`.
+- [x] TypeScript production build passed in CI.
+- [x] Current Vitest suite passed in CI.
+- [ ] Staging deployment and live provider integration tests.
+- [ ] Production infrastructure, backup/restore drill and final operational sign-off.
+
 ## Blocking items — do not launch with real customer data until closed
 
 1. **Email provider verification:** Resend delivery is implemented, but configure and verify the sender domain, secrets, templates/links and delivery events in staging. Confirm account verification and password reset end-to-end.
-2. **Database migrations — confirmed blocker:** there is currently no `prisma/migrations/` directory in the repository. The production Docker startup no longer runs `prisma db push`; this avoids silently mutating a live schema, but it also means a database cannot be provisioned by this image alone. Create and review a baseline migration, commit it, and deploy it with `prisma migrate deploy` before enabling the service. Do not use `prisma db push` as a production migration strategy.
+2. **Database migrations:** the initial baseline is now committed and was applied successfully to a clean PostgreSQL 16 database in CI. Before production, inspect the SQL against the actual target schema and apply it only to a new empty database or use a carefully reviewed baseline procedure for an existing database. Do not use `prisma db push` as a production migration strategy.
 3. **Automated tests:** add meaningful unit/integration tests, especially auth, authorization, tenant isolation and core CRUD. A successful TypeScript build is not a substitute.
 4. **CORS/browser authentication contract:** choose and verify token storage, XSS/CSRF protections, and exact production origins with the actual frontend.
 5. **Rate limiting at scale:** express-rate-limit's default in-memory store is per-process. Use a shared Redis-backed store before horizontal scaling.
@@ -61,4 +71,4 @@ Optional integrations must remain disabled until their credentials and webhook v
 
 ## Important scope note
 
-This document is a release gate, not a certification. The hardening changes have not been compiled or executed in the connected environment yet. CI must pass and staging verification must be completed before deployment.
+This document is a release gate, not a certification. The current CI run passed migration deployment to an empty PostgreSQL 16 service, TypeScript build and Vitest. Real provider credentials, staging deployment, operational drills and end-to-end customer flows have not yet been verified.
