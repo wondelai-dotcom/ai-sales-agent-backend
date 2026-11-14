@@ -63,6 +63,17 @@ export const authRepository = {
   setResetToken: (userId: string, resetTokenHash: string, expiresAt: Date) =>
     prisma.user.update({ where: { id: userId }, data: { resetTokenHash, resetTokenExpiresAt: expiresAt } }),
 
+  setEmailVerificationToken: (userId: string, tokenHash: string, expiresAt: Date) =>
+    prisma.user.update({ where: { id: userId }, data: { emailVerificationTokenHash: tokenHash, emailVerificationExpiresAt: expiresAt } }),
+
+  consumeEmailVerificationToken: async (tokenHash: string) => {
+    const result = await prisma.user.updateMany({
+      where: { emailVerificationTokenHash: tokenHash, emailVerificationExpiresAt: { gt: new Date() }, emailVerifiedAt: null },
+      data: { emailVerifiedAt: new Date(), emailVerificationTokenHash: null, emailVerificationExpiresAt: null },
+    });
+    return result.count === 1;
+  },
+
   consumeResetToken: async (resetTokenHash: string, passwordHash: string) => {
     const result = await prisma.user.updateMany({
       where: { resetTokenHash, resetTokenExpiresAt: { gt: new Date() } },
