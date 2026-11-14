@@ -1,6 +1,7 @@
 import { AppError } from "../../shared/errors/AppError";
 import { quoteRepository } from "./quote.repository";
 import { generateQuotePdf } from "./quote.pdf";
+import { clientRepository } from "../crm/clients/client.repository";
 
 function generateNumero(progressivo: number): string {
   const now = new Date();
@@ -20,6 +21,8 @@ export const quoteService = {
       notes?: string;
     }
   ) {
+    const client = await clientRepository.findById(companyId, input.clientId);
+    if (!client) throw AppError.notFound("Cliente non trovato");
     const count = await quoteRepository.countForCompany(companyId);
     const numero = generateNumero(count + 1);
     return quoteRepository.create(companyId, { ...input, numero });

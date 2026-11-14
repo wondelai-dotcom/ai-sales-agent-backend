@@ -7,6 +7,8 @@ import {
   refreshSchema,
   registerSchema,
   requestPasswordResetSchema,
+  verifyEmailSchema,
+  resendEmailVerificationSchema,
 } from "./auth.validation";
 
 export const authController = {
@@ -35,6 +37,18 @@ export const authController = {
 
   async me(req: AuthenticatedRequest, res: Response) {
     res.json(await authService.me(req.auth!.userId));
+  },
+
+  async resendEmailVerification(req: Request, res: Response) {
+    const { email } = resendEmailVerificationSchema.parse(req.body);
+    await authService.resendEmailVerification(email);
+    res.status(200).json({ message: "Se l'account esiste e non è verificato, riceverai un nuovo link" });
+  },
+
+  async verifyEmail(req: Request, res: Response) {
+    const { token } = verifyEmailSchema.parse(req.body);
+    await authService.verifyEmail(token);
+    res.status(200).json({ message: "Indirizzo email verificato" });
   },
 
   async requestPasswordReset(req: Request, res: Response) {

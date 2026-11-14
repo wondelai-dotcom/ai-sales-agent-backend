@@ -1,5 +1,6 @@
 import { AppError } from "../../shared/errors/AppError";
 import { appointmentRepository } from "./appointment.repository";
+import { clientRepository } from "../crm/clients/client.repository";
 
 // Orario di lavoro di default, usato finche' non e' configurabile per company
 // (nella spec e' un dato per azienda: da spostare su Company quando serve
@@ -18,6 +19,11 @@ export const appointmentService = {
   list: (companyId: string, from?: Date, to?: Date) => appointmentRepository.list(companyId, from, to),
 
   async create(companyId: string, input: { clientId: string; titolo: string; dataOra: Date; durataMin: number; note?: string }) {
+    const client = await clientRepository.findById(companyId, input.clientId);
+    if (!client) throw AppError.notFound("Cliente non trovato");
+    if (!Number.isFinite(input.dataOra.getTime()) || input.dataOra.getTime() <= Date.now()) {
+      throw AppError.validation("La data dell'appuntamento deve essere futura e valida");
+    }
     if (!isWithinWorkingHours(input.dataOra, input.durataMin)) {
       throw AppError.validation("L'orario richiesto e' fuori dagli orari di lavoro configurati");
     }

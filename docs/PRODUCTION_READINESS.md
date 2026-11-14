@@ -1,0 +1,74 @@
+# Production readiness gate
+
+This repository is not considered production-ready merely because it builds. Release requires the evidence below.
+
+## Changes in the hardening branch
+
+- Express 4 async controllers are wrapped so rejected promises reach the centralized error handler.
+- CORS is restricted to explicit origins in production; production startup fails without `CORS_ORIGINS`.
+- Production JWT secrets must be distinct and at least 32 characters.
+- Request body sizes are limited to 1 MB; `x-powered-by` is disabled; Helmet remains enabled.
+- Added liveness and database readiness endpoints.
+- Added a dedicated refresh endpoint rate limiter.
+- Refresh-token rotation now uses a conditional database update to prevent concurrent replay of the same refresh token.
+- Password reset clears the stored refresh-token hash, requiring re-authentication.
+- Added graceful shutdown and Prisma disconnect.
+- Added a CI workflow for Prisma generation, TypeScript build and available tests.
+
+## Release status (2026-11-14)
+
+- [x] Prisma schema validation in GitHub Actions.
+- [x] Initial PostgreSQL migration generated and committed at `prisma/migrations/20261114000000_initial/migration.sql`.
+- [x] Migration applied successfully to a clean PostgreSQL 16 database in CI using `prisma migrate deploy`.
+- [x] TypeScript production build passed in CI.
+- [x] Current Vitest suite passed in CI.
+- [ ] Staging deployment and live provider integration tests.
+- [ ] Production infrastructure, backup/restore drill and final operational sign-off.
+
+## Blocking items — do not launch with real customer data until closed
+
+1. **Email provider verification:** Resend delivery is implemented, but configure and verify the sender domain, secrets, templates/links and delivery events in staging. Confirm account verification and password reset end-to-end.
+2. **Database migrations:** the initial baseline is now committed and was applied successfully to a clean PostgreSQL 16 database in CI. Before production, inspect the SQL against the actual target schema and apply it only to a new empty database or use a carefully reviewed baseline procedure for an existing database. Do not use `prisma db push` as a production migration strategy.
+3. **Automated tests:** add meaningful unit/integration tests, especially auth, authorization, tenant isolation and core CRUD. A successful TypeScript build is not a substitute.
+4. **CORS/browser authentication contract:** choose and verify token storage, XSS/CSRF protections, and exact production origins with the actual frontend.
+5. **Rate limiting at scale:** express-rate-limit's default in-memory store is per-process. Use a shared Redis-backed store before horizontal scaling.
+6. **Tenant isolation audit:** initial code audit completed for connected CRM, AI, calendar, quotes, company and automation routes. Cross-company references are checked for lead/appointment/quote creation. Full adversarial integration tests and remaining stub modules still need verification.
+7. **RBAC:** OWNER/ADMIN guards are applied to company configuration and automation routes. Complete the role/permission matrix for every endpoint; several routes currently rely only on authentication.
+8. **Operational security:** configure HTTPS, managed secrets, database backups and restore drills, log retention/redaction, monitoring, alerting and incident response. Rate limiting is currently in-memory and supports a single backend replica only.
+9. **External services:** OpenAI adapter exists but needs a real API key and staging test. Stripe, WhatsApp/Meta, Firebase push and document storage are not implemented as production integrations; their environment variables alone do not constitute working integrations. Resend email is implemented but requires a verified sender and credentials.
+10. **Legal/privacy:** validate privacy notice, terms, data-processing agreements, retention/deletion procedures and GDPR obligations with qualified counsel.
+
+## Deployment environment
+
+Required:
+- `NODE_ENV=production`
+- `PORT` supplied by host (optional if default 4000 is accepted)
+- `DATABASE_URL` pointing to managed PostgreSQL over TLS where supported
+- `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`, distinct random values of at least 32 characters
+- `CORS_ORIGINS` as a comma-separated exact allowlist of HTTPS frontend origins
+- `TRUST_PROXY` set to the actual trusted proxy hop count only when applicable
+
+Optional integrations must remain disabled until their credentials and webhook validation are configured.
+
+## Health probes
+
+- `GET /health/live`: process liveness only.
+- `GET /health/ready`: checks database connectivity; returns 503 when unavailable.
+
+## Release procedure
+
+1. Review the complete diff and CI result.
+2. Provision a staging database and production-like environment variables.
+3. Generate and review the initial Prisma migration; commit the migration files and verify a clean database can be provisioned from scratch.
+4. Apply reviewed migrations using `prisma migrate deploy` and run `npx prisma db seed` (or the documented seed command) to create the required OWNER/ADMIN/MANAGER/OPERATOR roles.
+5. Run integration, authorization and tenant-isolation tests against staging.
+6. Verify password reset delivery, token rotation, logout and account recovery.
+7. Test backups and a restore to a separate database.
+8. Verify HTTPS, CORS, proxy behavior, rate limits and health probes.
+9. Perform a smoke test with synthetic data.
+10. Deploy with rollback available and monitor errors, latency and database health.
+11. Enable real customers only after every blocker is closed.
+
+## Important scope note
+
+This document is a release gate, not a certification. The current CI run passed migration deployment to an empty PostgreSQL 16 service, TypeScript build and Vitest. Real provider credentials, staging deployment, operational drills and end-to-end customer flows have not yet been verified.

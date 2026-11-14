@@ -139,7 +139,7 @@ model Permission {
 model User {
   id                String    @id @default(uuid())
   companyId         String
-  email             String
+  email             String    @unique
   passwordHash      String
   nome              String
   cognome           String
@@ -149,6 +149,9 @@ model User {
   resetTokenHash    String?
   resetTokenExpiresAt DateTime?
   isActive          Boolean   @default(true)
+  tokenVersion      Int       @default(0)
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -158,7 +161,6 @@ model User {
   notifications  Notification[]
   auditLogs      AuditLog[]
 
-  @@unique([companyId, email])
   @@index([companyId])
   @@map("users")
 }
@@ -324,6 +326,7 @@ model Quote {
   client  Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   items   QuoteItem[]
 
+  @@unique([companyId, numero])
   @@index([companyId])
   @@map("quotes")
 }

@@ -1,18 +1,29 @@
 import rateLimit from "express-rate-limit";
 
-// Rate limit generale sulle API pubbliche.
+const common = {
+  standardHeaders: true,
+  legacyHeaders: false,
+  // In-memory store is suitable for a single instance only. Configure a
+  // shared store (Redis) before running multiple backend replicas.
+};
+
 export const apiRateLimiter = rateLimit({
+  ...common,
   windowMs: 15 * 60 * 1000,
   limit: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
+  message: { error: { code: "TOO_MANY_REQUESTS", message: "Troppe richieste, riprova più tardi" } },
 });
 
-// Rate limit piu' stringente su login/registrazione per mitigare brute force.
 export const authRateLimiter = rateLimit({
+  ...common,
   windowMs: 15 * 60 * 1000,
   limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: { code: "TOO_MANY_ATTEMPTS", message: "Troppi tentativi, riprova piu' tardi" } },
+  message: { error: { code: "TOO_MANY_ATTEMPTS", message: "Troppi tentativi, riprova più tardi" } },
+});
+
+export const refreshRateLimiter = rateLimit({
+  ...common,
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  message: { error: { code: "TOO_MANY_REFRESH_ATTEMPTS", message: "Troppe richieste di rinnovo, effettua nuovamente il login" } },
 });

@@ -7,9 +7,9 @@ export const authRepository = {
   findRoleByName: (name: "OWNER" | "ADMIN" | "MANAGER" | "OPERATOR") =>
     prisma.role.findUnique({ where: { name } }),
 
-  findUserByEmail: (companyEmail: string) =>
-    prisma.user.findFirst({
-      where: { email: companyEmail },
+  findUserByEmail: (email: string) =>
+    prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
       include: { role: true },
     }),
 
@@ -46,15 +46,57 @@ export const authRepository = {
   setRefreshTokenHash: (userId: string, refreshTokenHash: string | null) =>
     prisma.user.update({ where: { id: userId }, data: { refreshTokenHash } }),
 
+  revokeSessions: (userId: string) =>
+    prisma.user.update({
+      where: { id: userId },
+      data: { refreshTokenHash: null, tokenVersion: { increment: 1 } },
+    }),
+
+  rotateRefreshTokenHash: async (userId: string, expectedHash: string, nextHash: string) => {
+    const result = await prisma.user.updateMany({
+      where: { id: userId, refreshTokenHash: expectedHash, isActive: true },
+      data: { refreshTokenHash: nextHash },
+    });
+    return result.count === 1;
+  },
+
   setResetToken: (userId: string, resetTokenHash: string, expiresAt: Date) =>
     prisma.user.update({ where: { id: userId }, data: { resetTokenHash, resetTokenExpiresAt: expiresAt } }),
 
-  findByResetTokenHash: (resetTokenHash: string) =>
-    prisma.user.findFirst({ where: { resetTokenHash, resetTokenExpiresAt: { gt: new Date() } } }),
+  setEmailVerificationToken: (userId: string, tokenHash: string, expiresAt: Date) =>
+    prisma.user.update({ where: { id: userId }, data: { emailVerificationTokenHash: tokenHash, emailVerificationExpiresAt: expiresAt } }),
+
+  consumeEmailVerificationToken: async (tokenHash: string) => {
+    const result = await prisma.user.updateMany({
+      where: { emailVerificationTokenHash: tokenHash, emailVerificationExpiresAt: { gt: new Date() }, emailVerifiedAt: null },
+      data: { emailVerifiedAt: new Date(), emailVerificationTokenHash: null, emailVerificationExpiresAt: null },
+    });
+    return result.count === 1;
+  },
+
+  consumeResetToken: async (resetTokenHash: string, passwordHash: string) => {
+    const result = await prisma.user.updateMany({
+      where: { resetTokenHash, resetTokenExpiresAt: { gt: new Date() } },
+      data: {
+        passwordHash,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+        refreshTokenHash: null,
+        tokenVersion: { increment: 1 },
+      },
+    });
+    return result.count === 1;
+  },
 
   updatePasswordAndClearReset: (userId: string, passwordHash: string) =>
     prisma.user.update({
       where: { id: userId },
-      data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+      data: {
+        passwordHash,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+        refreshTokenHash: null,
+        tokenVersion: { increment: 1 },
+      },
     }),
 };
