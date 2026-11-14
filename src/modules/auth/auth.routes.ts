@@ -9,6 +9,7 @@ export const authRouter = Router();
 authRouter.post("/register", authRateLimiter, asyncHandler(authController.register));
 authRouter.post("/login", authRateLimiter, asyncHandler(authController.login));
 authRouter.post("/refresh", refreshRateLimiter, asyncHandler(authController.refresh));
+authRouter.post("/resend-verification", authRateLimiter, asyncHandler(authController.resendEmailVerification));
 authRouter.post("/verify-email", authRateLimiter, asyncHandler(authController.verifyEmail));
 authRouter.post("/password-reset/request", authRateLimiter, asyncHandler(authController.requestPasswordReset));
 authRouter.post("/password-reset/confirm", authRateLimiter, asyncHandler(authController.confirmPasswordReset));
