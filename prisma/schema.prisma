@@ -326,6 +326,7 @@ model Quote {
   client  Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   items   QuoteItem[]
 
+  @@unique([companyId, numero])
   @@index([companyId])
   @@map("quotes")
 }
