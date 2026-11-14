@@ -134,4 +134,25 @@ function openClientModal(){
  document.body.append(modal);const close=()=>modal.remove();$(".modal-close",modal).onclick=close;$(".modal-cancel",modal).onclick=close;modal.onclick=e=>{if(e.target===modal)close();};
  $("#client-form",modal).onsubmit=async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget).entries());try{await request("/api/clients",{method:"POST",body:JSON.stringify(body)});close();notify("Cliente creato correttamente.");renderPage();}catch(err){$("#modal-error",modal).textContent=err.message;}};
 }
-if(state.token) loadApp(); else authView();
+function tokenActionView(kind){
+  const params=new URLSearchParams(location.search);
+  const token=params.get("token");
+  const reset=kind==="reset";
+  $("#app").innerHTML=`
+    <main class="auth-shell"><section class="auth-brand"><div class="brand-mark">A</div><span class="eyebrow">AI SALES AGENT</span><h1>La tua attività,<br><em>sempre sotto controllo.</em></h1><p>Completa la verifica del tuo account per accedere al workspace.</p></section>
+    <section class="auth-panel"><div class="auth-card"><div class="brand-inline"><div class="brand-mark small">A</div><b>AI Sales Agent</b></div><span class="eyebrow muted">${reset?"SICUREZZA ACCOUNT":"VERIFICA EMAIL"}</span><h2>${reset?"Scegli una nuova password":"Conferma la tua email"}</h2>
+    ${reset?'<form id="token-form" class="form-stack"><label>Nuova password<input type="password" name="newPassword" minlength="12" autocomplete="new-password" required /></label><button class="btn primary wide">Aggiorna password →</button></form>':'<p class="sub">Conferma il tuo indirizzo email per attivare l’account.</p><button id="verify-token" class="btn primary wide">Verifica indirizzo email →</button>'}
+    <div id="token-message" class="form-error" role="status"></div><button id="back-login" class="text-button">Torna all'accesso</button></div></section></main><div id="toast" class="toast"></div>`;
+  $("#back-login").onclick=()=>{history.replaceState(null,"","/");authView();};
+  const submit=async body=>{
+    if(!token){$("#token-message").textContent="Il collegamento non contiene un token valido.";return;}
+    try{await request(reset?"/api/auth/password-reset/confirm":"/api/auth/verify-email",{method:"POST",body:JSON.stringify({...body,token})});$("#token-message").className="form-success";$("#token-message").textContent=reset?"Password aggiornata. Ora puoi accedere.":"Email verificata. Ora puoi accedere."; }
+    catch(err){$("#token-message").textContent=err.message;}
+  };
+  if(reset) $("#token-form").onsubmit=e=>{e.preventDefault();submit({newPassword:new FormData(e.currentTarget).get("newPassword")});};
+  else $("#verify-token").onclick=()=>submit({});
+}
+const route=location.pathname;
+if(route==="/verify-email") tokenActionView("verify");
+else if(route==="/reset-password") tokenActionView("reset");
+else if(state.token) loadApp(); else authView();
