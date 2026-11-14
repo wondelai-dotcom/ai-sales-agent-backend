@@ -1,3 +1,4 @@
+import "./style.css";
 const API = (import.meta.env.VITE_API_URL || "https://ai-sales-agent-backend-6ve3.onrender.com").replace(/\/$/, "");
 const $ = (selector, root=document) => root.querySelector(selector);
 const state = { token: sessionStorage.getItem("asa_access_token"), user: null, page: "overview", busy: false };
