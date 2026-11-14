@@ -15,6 +15,11 @@ import { companyRouter } from "./modules/company/company.routes";
 export function createApp() {
   const app = express();
 
+  // Render terminates TLS and forwards one trusted proxy hop.
+  // Configure this before rate limiting so express-rate-limit can
+  // safely use the client IP from X-Forwarded-For.
+  app.set("trust proxy", 1);
+
   app.use(helmet());
   app.use(cors());
   app.use(express.json());
