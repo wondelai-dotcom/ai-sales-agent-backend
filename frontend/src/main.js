@@ -34,14 +34,27 @@ function authView(mode="login") {
       </form>
       <div class="auth-switch">${register?"Hai già un account?":"Non hai ancora un account?"} <button id="switch-auth" class="text-button">${register?"Accedi":"Crea un account"}</button></div>
       <div id="auth-error" class="form-error" role="alert"></div>
+      ${!register?'<button id="forgot-password" class="text-button" type="button">Hai dimenticato la password?</button>':""}
       <p class="legal">Continuando accetti di utilizzare il servizio nel rispetto dei termini e dell'informativa privacy.</p></div></section>
     </main><div id="toast" class="toast"></div>`;
   $("#switch-auth").onclick=()=>authView(register?"login":"register");
+  if(!register) $("#forgot-password").onclick=async()=>{
+    const email=$('input[name="email"]')?.value?.trim();
+    if(!email){$("#auth-error").textContent="Inserisci prima la tua email.";return;}
+    try{await request("/api/auth/password-reset/request",{method:"POST",body:JSON.stringify({email})});$("#auth-error").className="form-success";$("#auth-error").textContent="Se l'indirizzo è registrato, riceverai le istruzioni per reimpostare la password.";}
+    catch(err){$("#auth-error").textContent=err.message;}
+  };
   $("#auth-form").onsubmit=async e=>{
     e.preventDefault(); const button=$("button[type=submit]",e.currentTarget); button.disabled=true; button.textContent="Attendi…";
     const body=Object.fromEntries(new FormData(e.currentTarget).entries());
     try {
       const result=await request("/api/auth/"+(register?"register":"login"),{method:"POST",body:JSON.stringify(body)});
+      if(register){
+        $("#auth-error").className="form-success";
+        $("#auth-error").textContent="Account creato. Controlla la tua casella email e conferma l'indirizzo prima di accedere.";
+        button.disabled=false; button.textContent="Crea account";
+        return;
+      }
       if(result.accessToken){state.token=result.accessToken;sessionStorage.setItem("asa_access_token",state.token);}
       else throw new Error("Il server non ha restituito un token di accesso.");
       await loadApp();
