@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const repository = { list: vi.fn(), findOverlapping: vi.fn(), create: vi.fn(), updateStatus: vi.fn() };
-const clients = { findById: vi.fn() };
+const { repository, clients } = vi.hoisted(() => ({ repository: { list: vi.fn(), findOverlapping: vi.fn(), create: vi.fn(), updateStatus: vi.fn() }, clients: { findById: vi.fn() } }));
 vi.mock("./appointment.repository", () => ({ appointmentRepository: repository }));
 vi.mock("../crm/clients/client.repository", () => ({ clientRepository: clients }));
 
