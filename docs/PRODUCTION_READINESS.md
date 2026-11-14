@@ -22,10 +22,10 @@ This repository is not considered production-ready merely because it builds. Rel
 3. **Automated tests:** add meaningful unit/integration tests, especially auth, authorization, tenant isolation and core CRUD. A successful TypeScript build is not a substitute.
 4. **CORS/browser authentication contract:** choose and verify token storage, XSS/CSRF protections, and exact production origins with the actual frontend.
 5. **Rate limiting at scale:** express-rate-limit's default in-memory store is per-process. Use a shared Redis-backed store before horizontal scaling.
-6. **Tenant isolation audit:** audit every repository query and nested relation mutation for companyId scoping. Test cross-company access for all resource types.
-7. **RBAC:** confirm privileged operations are guarded by explicit role/permission checks. A role middleware existing in the codebase does not prove route coverage.
-8. **Operational security:** configure HTTPS, managed secrets, database backups and restore drills, log retention/redaction, monitoring, alerting and incident response.
-9. **External services:** verify OpenAI, Stripe, WhatsApp/Meta and notification provider credentials, webhooks, signatures and failure behavior before enabling their routes/features.
+6. **Tenant isolation audit:** initial code audit completed for connected CRM, AI, calendar, quotes, company and automation routes. Cross-company references are checked for lead/appointment/quote creation. Full adversarial integration tests and remaining stub modules still need verification.
+7. **RBAC:** OWNER/ADMIN guards are applied to company configuration and automation routes. Complete the role/permission matrix for every endpoint; several routes currently rely only on authentication.
+8. **Operational security:** configure HTTPS, managed secrets, database backups and restore drills, log retention/redaction, monitoring, alerting and incident response. Rate limiting is currently in-memory and supports a single backend replica only.
+9. **External services:** OpenAI adapter exists but needs a real API key and staging test. Stripe, WhatsApp/Meta, Firebase push and document storage are not implemented as production integrations; their environment variables alone do not constitute working integrations. Resend email is implemented but requires a verified sender and credentials.
 10. **Legal/privacy:** validate privacy notice, terms, data-processing agreements, retention/deletion procedures and GDPR obligations with qualified counsel.
 
 ## Deployment environment
