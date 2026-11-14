@@ -21,6 +21,7 @@ function integerAtLeast(name: string, value: string, fallback: number, minimum: 
 }
 
 const nodeEnv = optional("NODE_ENV", "development");
+function databaseUrlIsTls(value: string) { return /[?&]sslmode=require(?:&|$)/i.test(value); }
 const accessSecret = required("JWT_ACCESS_SECRET");
 const refreshSecret = required("JWT_REFRESH_SECRET");
 
@@ -48,6 +49,13 @@ if (nodeEnv === "production" && (!resendApiKey || !emailFrom || !appBaseUrl)) {
 
 if (nodeEnv === "production" && allowedOrigins.length === 0) {
   throw new Error("CORS_ORIGINS è obbligatoria in produzione (lista separata da virgole)");
+}
+if (nodeEnv === "production") {
+  for (const origin of allowedOrigins) {
+    if (new URL(origin).protocol !== "https:") throw new Error("Le origini CORS di produzione devono usare HTTPS");
+  }
+  if (new URL(appBaseUrl).protocol !== "https:") throw new Error("APP_BASE_URL deve usare HTTPS in produzione");
+  if (!databaseUrlIsTls(required("DATABASE_URL"))) throw new Error("DATABASE_URL deve richiedere TLS in produzione (sslmode=require)");
 }
 
 export const env = {
